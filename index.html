@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Click e Pads</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: ferramenta de palco. Cabeçalho, linha de saída de som e dois painéis lado a lado (Click em âmbar, Pads em verde-água) que empilham no celular. */
+:root{
+  --bg:#10131a; --surface:#181c25; --surface2:#202532; --line:#2d3444; --fg:#e8ebf1; --muted:#9aa3b5;
+  --click:#f0b03c; --click-ink:#1c1303; --pad:#55c8bd; --pad-ink:#04211e;
+  --f-display:'Barlow Condensed','Arial Narrow',sans-serif; --f-body:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#eceef2; --surface:#ffffff; --surface2:#f1f3f7; --line:#d2d8e2; --fg:#161a22; --muted:#566074;
+    --click:#9e5c00; --click-ink:#ffffff; --pad:#0a7871; --pad-ink:#ffffff; color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#eceef2; --surface:#ffffff; --surface2:#f1f3f7; --line:#d2d8e2; --fg:#161a22; --muted:#566074;
+  --click:#9e5c00; --click-ink:#ffffff; --pad:#0a7871; --pad-ink:#ffffff; color-scheme:light;
+}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+body{background:var(--bg);color:var(--fg);font:16px/1.45 var(--f-body);padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));-webkit-tap-highlight-color:transparent}
+button,input{font:inherit;color:inherit}
+.app{max-width:980px;margin:0 auto;display:grid;gap:16px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:8px 16px;flex-wrap:wrap}
+h1{margin:0;font:700 40px/1 var(--f-display);letter-spacing:.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:14px}
+.out{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 18px;display:grid;gap:10px}
+.out-row{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.label{font:600 13px/1 var(--f-display);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.hint{margin:0;color:var(--muted);font-size:14px;max-width:70ch}
+.panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel.click{--acc:var(--click);--acc-ink:var(--click-ink)}
+.panel.pad{--acc:var(--pad);--acc-ink:var(--pad-ink)}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ph h2{margin:0;font:700 26px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;color:var(--acc)}
+.pill{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.pill.on{color:var(--acc);border-color:var(--acc)}
+.btn{min-height:48px;padding:0 16px;border:1px solid var(--line);background:var(--surface2);border-radius:10px;font-weight:600;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.btn:active{transform:scale(.97)}
+.btn:focus-visible,.go:focus-visible,input:focus-visible{outline:2px solid var(--acc,var(--fg));outline-offset:2px}
+.btn[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.seg{display:flex;gap:8px;flex-wrap:wrap}
+.seg .btn{--acc:var(--fg);--acc-ink:var(--bg)}
+.bpm{display:flex;align-items:center;justify-content:center;gap:12px}
+.bpm .btn{width:56px;height:56px;padding:0;font-size:28px;line-height:1}
+.bpm-mid{display:grid;justify-items:center;gap:2px}
+#bpm{width:3.2ch;border:0;background:transparent;text-align:center;font:700 76px/1 var(--f-display);font-variant-numeric:tabular-nums;padding:0;border-radius:8px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper .btn{width:48px;padding:0;font-size:22px}
+.num{min-width:2.2ch;text-align:center;font:700 34px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.slash{font:600 30px/1 var(--f-display);color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips .btn{min-height:42px;padding:0 14px;font-variant-numeric:tabular-nums}
+.check{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;font-size:15px}
+.check input{width:22px;height:22px;accent-color:var(--acc)}
+.dots{display:flex;flex-wrap:wrap;gap:10px;align-items:center;min-height:34px}
+.dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);background:transparent;transition:transform .06s,background-color .06s}
+.dot[data-l="0"]{width:28px;height:28px;border-color:var(--acc)}
+.dot[data-l="1"]{border-color:var(--muted)}
+.dot.on{background:var(--acc);border-color:var(--acc);transform:scale(1.18)}
+.field{display:grid;gap:6px}
+.field-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.val{font:600 20px/1 var(--f-display);font-variant-numeric:tabular-nums;letter-spacing:.03em}
+input[type=range]{width:100%;height:34px;margin:0;accent-color:var(--acc);cursor:pointer}
+.go{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:62px;border-radius:12px;border:2px solid var(--acc);background:var(--acc);color:var(--acc-ink);font:700 22px/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;touch-action:manipulation}
+.go[aria-pressed="true"]{background:transparent;color:var(--acc)}
+.go:active{transform:scale(.99)}
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.key{min-height:64px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.key b{font:700 28px/1 var(--f-display)}
+.key small{font-size:12px;line-height:1;min-height:12px;color:var(--muted)}
+.key[aria-pressed="true"] small{color:var(--acc-ink)}
+.cur{display:flex;align-items:baseline;gap:12px}
+.cur-k{font:700 64px/1 var(--f-display);color:var(--acc)}
+.cur-t{color:var(--muted);font-size:14px}
+.note{margin:0;color:var(--muted);font-size:13px}
+@media (prefers-reduced-motion: reduce){.dot,.btn,.go{transition:none}.btn:active,.go:active{transform:none}}
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Click e Pads</h1>
+    <span class="sub">Protótipo 1 · metrônomo e pads contínuos</span>
+  </header>
+
+  <section class="out" aria-label="Saída de som">
+    <div class="out-row">
+      <span class="label">Saída de som</span>
+      <div class="seg" role="group" aria-label="Modo de saída">
+        <button class="btn" id="modeStereo" type="button" aria-pressed="true">Estéreo normal</button>
+        <button class="btn" id="modeSplit" type="button" aria-pressed="false">Click à esquerda · Pad à direita</button>
+      </div>
+    </div>
+    <p class="hint">No modo dividido, o click sai só pelo canal esquerdo e o pad só pelo direito. Com um cabo Y ou adaptador estéreo para dois mono, você manda o click para o fone e o pad para a mesa.</p>
+  </section>
+
+  <div class="panels">
+    <section class="panel click" aria-label="Click">
+      <div class="ph"><h2>Click</h2><span class="pill" id="clickPill">Parado</span></div>
+
+      <div class="field">
+        <div class="bpm">
+          <button class="btn" id="bpmMinus" type="button" aria-label="Diminuir BPM">−</button>
+          <div class="bpm-mid">
+            <input id="bpm" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" aria-label="BPM" value="100">
+            <span class="label">BPM</span>
+          </div>
+          <button class="btn" id="bpmPlus" type="button" aria-label="Aumentar BPM">+</button>
+        </div>
+        <input id="bpmRange" type="range" min="30" max="300" step="1" value="100" aria-label="BPM">
+        <div class="row" style="justify-content:center"><button class="btn" id="tap" type="button">Tap tempo</button></div>
+      </div>
+
+      <div class="field">
+        <span class="label">Compasso</span>
+        <div class="row">
+          <div class="stepper">
+            <button class="btn" id="numMinus" type="button" aria-label="Menos tempos">−</button>
+            <span class="num" id="numVal" aria-live="polite">4</span>
+            <button class="btn" id="numPlus" type="button" aria-label="Mais tempos">+</button>
+          </div>
+          <span class="slash">/</span>
+          <div class="chips" id="dens" role="group" aria-label="Figura do compasso"></div>
+        </div>
+        <div class="chips" id="presets" role="group" aria-label="Compassos prontos"></div>
+        <p class="note">O BPM conta cada clique, ou seja, a figura de baixo do compasso. Em 6/8 o click marca cada colcheia.</p>
+      </div>
+
+      <div class="field">
+        <div class="dots" id="dots" aria-hidden="true"></div>
+        <label class="check"><input type="checkbox" id="accent"> Acentuar o tempo 1</label>
+        <label class="check"><input type="checkbox" id="group"> Marcar grupos de 3 (6/8, 9/8, 12/8)</label>
+      </div>
+
+      <div class="field">
+        <div class="field-top"><label class="label" for="clickVol">Volume do click</label><span class="val" id="clickVolVal">80%</span></div>
+        <input id="clickVol" type="range" min="0" max="100" step="1" value="80">
+      </div>
+
+      <button class="go" id="clickGo" type="button" aria-pressed="false"></button>
+    </section>
+
+    <section class="panel pad" aria-label="Pads">
+      <div class="ph"><h2>Pads</h2><span class="pill" id="padPill">Parado</span></div>
+
+      <div class="cur"><span class="cur-k" id="curKey">C</span><span class="cur-t">tom atual</span></div>
+
+      <div class="keys" id="keys" role="group" aria-label="Tom do pad"></div>
+
+      <div class="field">
+        <div class="field-top"><label class="label" for="padVol">Volume do pad</label><span class="val" id="padVolVal">70%</span></div>
+        <input id="padVol" type="range" min="0" max="100" step="1" value="70">
+      </div>
+      <div class="field">
+        <div class="field-top"><label class="label" for="bright">Brilho do pad</label><span class="val" id="brightVal">45%</span></div>
+        <input id="bright" type="range" min="0" max="100" step="1" value="45">
+      </div>
+      <div class="field">
+        <div class="field-top"><label class="label" for="fade">Tempo de transição</label><span class="val" id="fadeVal">3,0 s</span></div>
+        <input id="fade" type="range" min="0.5" max="8" step="0.5" value="3">
+        <p class="note">Quanto tempo o pad leva para entrar, sair e trocar de tom.</p>
+      </div>
+
+      <button class="go" id="padGo" type="button" aria-pressed="false"></button>
+    </section>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $ = (s) => document.querySelector(s);
+const clamp = (v,a,b) => Math.min(b, Math.max(a,v));
+const KEYS = [['C',''],['C♯','D♭'],['D',''],['D♯','E♭'],['E',''],['F',''],['F♯','G♭'],['G',''],['G♯','A♭'],['A',''],['A♯','B♭'],['B','']];
+const DENS = [2,4,8,16];
+const PRESETS = [[2,4,false],[3,4,false],[4,4,false],[5,4,false],[6,8,true],[7,8,false],[9,8,true],[12,8,true]];
+const STORE = 'clickpads.v1';
+
+const state = {bpm:100,num:4,den:4,group:false,accent:true,clickVol:80,padVol:70,bright:45,fade:3,key:0,mode:'stereo'};
+try{
+  const s = JSON.parse(localStorage.getItem(STORE) || 'null');
+  if(s && typeof s === 'object') Object.assign(state, s);
+}catch(e){}
+state.bpm = clamp(Math.round(+state.bpm || 100), 30, 300);
+state.num = clamp(Math.round(+state.num || 4), 1, 16);
+if(DENS.indexOf(state.den) < 0) state.den = 4;
+state.clickVol = clamp(+state.clickVol || 0, 0, 100);
+state.padVol = clamp(+state.padVol || 0, 0, 100);
+state.bright = clamp(+state.bright || 0, 0, 100);
+state.fade = clamp(+state.fade || 3, 0.5, 8);
+state.key = clamp(Math.round(+state.key || 0), 0, 11);
+state.mode = state.mode === 'split' ? 'split' : 'stereo';
+state.group = !!state.group;
+state.accent = state.accent !== false;
+function save(){ try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){} }
+
+/* ---------- ícones e botões de iniciar/parar ---------- */
+const ICON_PLAY = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>';
+const ICON_STOP = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>';
+function setGo(btn, on, a, b){ btn.setAttribute('aria-pressed', on ? 'true' : 'false'); btn.innerHTML = (on ? ICON_STOP : ICON_PLAY) + '<span>' + (on ? b : a) + '</span>'; }
+
+/* ---------- áudio ---------- */
+let ctx = null, clickBus, padBus, clickPan, padPan;
+function audio(){
+  if(!ctx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC({latencyHint:'interactive'});
+    clickBus = ctx.createGain(); padBus = ctx.createGain();
+    clickPan = ctx.createStereoPanner(); padPan = ctx.createStereoPanner();
+    clickBus.connect(clickPan); clickPan.connect(ctx.destination);
+    padBus.connect(padPan); padPan.connect(ctx.destination);
+    applyMix(true);
+  }
+  if(ctx.state !== 'running') ctx.resume();
+  return ctx;
+}
+function applyMix(now){
+  if(!ctx) return;
+  const t = ctx.currentTime, tc = now ? 0.001 : 0.03;
+  clickBus.gain.setTargetAtTime(Math.pow(state.clickVol/100, 2), t, tc);
+  padBus.gain.setTargetAtTime(Math.pow(state.padVol/100, 2) * 0.85, t, tc);
+  clickPan.pan.value = state.mode === 'split' ? -1 : 0;
+  padPan.pan.value = state.mode === 'split' ? 1 : 0;
+}
+
+/* ---------- click ---------- */
+const FREQ = [1750, 1300, 980];
+const GAIN = [1, 0.75, 0.5];
+let clicking = false, nextT = 0, beat = 0, timer = null, raf = 0;
+const queue = [];
+function levelOf(i){
+  if(!state.accent) return 1;
+  if(i === 0) return 0;
+  if(state.group && i % 3 === 0) return 1;
+  return 2;
+}
+function fire(t, i){
+  const lv = levelOf(i);
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = 'triangle'; o.frequency.value = FREQ[lv];
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(GAIN[lv], t + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+  o.connect(g); g.connect(clickBus);
+  o.start(t); o.stop(t + 0.08);
+}
+function pump(){
+  const horizon = ctx.currentTime + 0.25;
+  while(nextT < horizon){
+    if(beat >= state.num) beat = 0;
+    fire(nextT, beat);
+    queue.push({t:nextT, i:beat});
+    nextT += 60 / state.bpm;
+    beat = (beat + 1) % state.num;
+  }
+}
+function frame(){
+  if(!clicking) return;
+  const now = ctx.currentTime - (ctx.outputLatency || 0);
+  let found;
+  while(queue.length && queue[0].t <= now){ found = queue.shift().i; }
+  if(found !== undefined) setActive(found);
+  raf = requestAnimationFrame(frame);
+}
+function startClick(){
+  audio();
+  clicking = true; beat = 0; queue.length = 0;
+  nextT = ctx.currentTime + 0.08;
+  pump();
+  timer = setInterval(pump, 25);
+  raf = requestAnimationFrame(frame);
+  renderClickState(); syncWake();
+}
+function stopClick(){
+  clicking = false;
+  clearInterval(timer); cancelAnimationFrame(raf);
+  queue.length = 0; setActive(-1);
+  renderClickState(); syncWake();
+}
+
+/* ---------- pad ---------- */
+const NOTES = [
+  {s:-12, g:0.55, type:'sine',     pair:false},
+  {s:0,   g:0.40, type:'triangle', pair:true},
+  {s:7,   g:0.28, type:'triangle', pair:true},
+  {s:12,  g:0.12, type:'sawtooth', pair:true},
+  {s:19,  g:0.15, type:'triangle', pair:true}
+];
+let padOn = false, voice = null;
+function cutoff(){ return 300 * Math.pow(10, (state.bright / 100) * 1.1); }
+function makeVoice(k){
+  const c = audio(), t = c.currentTime;
+  const out = c.createGain(); out.gain.value = 0;
+  const filt = c.createBiquadFilter(); filt.type = 'lowpass'; filt.Q.value = 0.6;
+  const cut = cutoff(); filt.frequency.value = cut;
+  const lfo = c.createOscillator(); lfo.frequency.value = 0.09 + Math.random() * 0.05;
+  const lfoG = c.createGain(); lfoG.gain.value = cut * 0.25;
+  lfo.connect(lfoG); lfoG.connect(filt.frequency); lfo.start(t);
+  filt.connect(out); out.connect(padBus);
+  const base = 48 + k, oscs = [lfo];
+  NOTES.forEach((n) => {
+    const f = 440 * Math.pow(2, (base + n.s - 69) / 12);
+    const ng = c.createGain(); ng.gain.value = n.g; ng.connect(filt);
+    const dets = n.pair ? [-7, 7] : [0];
+    dets.forEach((d, i) => {
+      const o = c.createOscillator();
+      o.type = n.type; o.frequency.value = f; o.detune.value = d;
+      if(n.pair){
+        const p = c.createStereoPanner(); p.pan.value = i ? 0.45 : -0.45;
+        o.connect(p); p.connect(ng);
+      } else { o.connect(ng); }
+      o.start(t); oscs.push(o);
+    });
+  });
+  return {out, filt, lfoG, oscs};
+}
+function fadeIn(v){ v.out.gain.setTargetAtTime(0.28, ctx.currentTime, state.fade / 3.5); }
+function release(v){
+  const t = ctx.currentTime, span = state.fade * 1.6 + 0.3;
+  v.out.gain.setTargetAtTime(0, t, state.fade / 3.5);
+  v.oscs.forEach((o) => { try{ o.stop(t + span); }catch(e){} });
+  setTimeout(() => { try{ v.out.disconnect(); }catch(e){} }, (span + 0.4) * 1000);
+}
+function startPad(){
+  voice = makeVoice(state.key); fadeIn(voice); padOn = true;
+  renderPadState(); syncWake();
+}
+function stopPad(){
+  if(voice) release(voice);
+  voice = null; padOn = false;
+  renderPadState(); syncWake();
+}
+function setKey(k){
+  state.key = k; save();
+  if(padOn){
+    const old = voice;
+    voice = makeVoice(k); fadeIn(voice);
+    if(old) release(old);
+  }
+  renderKeys();
+}
+function applyBright(){
+  if(!voice) return;
+  const t = ctx.currentTime, c = cutoff();
+  voice.filt.frequency.setTargetAtTime(c, t, 0.05);
+  voice.lfoG.gain.setTargetAtTime(c * 0.25, t, 0.05);
+}
+
+/* ---------- tela ligada ---------- */
+let wl = null;
+async function syncWake(){
+  const need = clicking || padOn;
+  try{
+    if(need && !wl && navigator.wakeLock){
+      wl = await navigator.wakeLock.request('screen');
+      wl.addEventListener('release', () => { wl = null; });
+    } else if(!need && wl){
+      await wl.release(); wl = null;
+    }
+  }catch(e){ wl = null; }
+}
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') syncWake(); });
+
+/* ---------- interface ---------- */
+const bpmEl = $('#bpm'), bpmRange = $('#bpmRange'), numVal = $('#numVal');
+function setBpm(v){
+  state.bpm = clamp(Math.round(v), 30, 300);
+  bpmEl.value = state.bpm; bpmRange.value = state.bpm; save();
+}
+function setNum(n){
+  state.num = clamp(n, 1, 16);
+  if(beat >= state.num) beat = 0;
+  numVal.textContent = state.num;
+  renderDots(); renderPresets(); save();
+}
+function setDen(d){ state.den = d; renderDens(); renderPresets(); save(); }
+
+let dotEls = [], activeDot = -1;
+function renderDots(){
+  const box = $('#dots'); box.innerHTML = ''; dotEls = []; activeDot = -1;
+  for(let i = 0; i < state.num; i++){
+    const d = document.createElement('span');
+    d.className = 'dot'; d.dataset.l = levelOf(i);
+    box.appendChild(d); dotEls.push(d);
+  }
+}
+function setActive(i){
+  if(activeDot >= 0 && dotEls[activeDot]) dotEls[activeDot].classList.remove('on');
+  activeDot = i;
+  if(i >= 0 && dotEls[i]) dotEls[i].classList.add('on');
+}
+function renderDens(){
+  const box = $('#dens'); box.innerHTML = '';
+  DENS.forEach((d) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn'; b.textContent = d;
+    b.setAttribute('aria-pressed', d === state.den ? 'true' : 'false');
+    b.addEventListener('click', () => setDen(d));
+    box.appendChild(b);
+  });
+}
+function renderPresets(){
+  const box = $('#presets'); box.innerHTML = '';
+  PRESETS.forEach((p) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn'; b.textContent = p[0] + '/' + p[1];
+    b.setAttribute('aria-pressed', (p[0] === state.num && p[1] === state.den) ? 'true' : 'false');
+    b.addEventListener('click', () => {
+      state.group = p[2]; $('#group').checked = state.group;
+      state.den = p[1]; renderDens(); setNum(p[0]);
+    });
+    box.appendChild(b);
+  });
+}
+function renderKeys(){
+  const box = $('#keys'); box.innerHTML = '';
+  KEYS.forEach((k, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn key';
+    b.setAttribute('aria-pressed', i === state.key ? 'true' : 'false');
+    b.innerHTML = '<b>' + k[0] + '</b><small>' + (k[1] || '&nbsp;') + '</small>';
+    b.addEventListener('click', () => setKey(i));
+    box.appendChild(b);
+  });
+  const k = KEYS[state.key];
+  $('#curKey').textContent = k[1] ? k[0] + ' / ' + k[1] : k[0];
+}
+function renderClickState(){
+  setGo($('#clickGo'), clicking, 'Iniciar click', 'Parar click');
+  const p = $('#clickPill'); p.textContent = clicking ? 'Tocando' : 'Parado'; p.classList.toggle('on', clicking);
+}
+function renderPadState(){
+  setGo($('#padGo'), padOn, 'Iniciar pad', 'Parar pad');
+  const p = $('#padPill'); p.textContent = padOn ? 'Tocando' : 'Parado'; p.classList.toggle('on', padOn);
+}
+function renderMode(){
+  $('#modeStereo').setAttribute('aria-pressed', state.mode === 'stereo' ? 'true' : 'false');
+  $('#modeSplit').setAttribute('aria-pressed', state.mode === 'split' ? 'true' : 'false');
+}
+function fmtFade(){ return state.fade.toFixed(1).replace('.', ',') + ' s'; }
+
+/* botão que repete enquanto está pressionado */
+function hold(btn, fn){
+  let t1, t2;
+  const stop = () => { clearTimeout(t1); clearInterval(t2); };
+  btn.addEventListener('pointerdown', (e) => { e.preventDefault(); fn(); t1 = setTimeout(() => { t2 = setInterval(fn, 80); }, 400); });
+  ['pointerup','pointerleave','pointercancel'].forEach((ev) => btn.addEventListener(ev, stop));
+  btn.addEventListener('keydown', (e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); fn(); } });
+}
+hold($('#bpmMinus'), () => setBpm(state.bpm - 1));
+hold($('#bpmPlus'), () => setBpm(state.bpm + 1));
+$('#numMinus').addEventListener('click', () => setNum(state.num - 1));
+$('#numPlus').addEventListener('click', () => setNum(state.num + 1));
+
+bpmRange.addEventListener('input', () => setBpm(+bpmRange.value));
+bpmEl.addEventListener('focus', () => bpmEl.select());
+bpmEl.addEventListener('change', () => {
+  const v = parseInt(bpmEl.value.replace(/\D/g, ''), 10);
+  setBpm(isNaN(v) ? state.bpm : v);
+});
+bpmEl.addEventListener('keydown', (e) => { if(e.key === 'Enter') bpmEl.blur(); });
+
+/* tap tempo */
+let taps = [];
+$('#tap').addEventListener('click', () => {
+  const now = performance.now();
+  if(taps.length && now - taps[taps.length - 1] > 2000) taps = [];
+  taps.push(now); taps = taps.slice(-6);
+  if(taps.length >= 2){
+    const avg = (taps[taps.length - 1] - taps[0]) / (taps.length - 1);
+    setBpm(60000 / avg);
+  }
+});
+
+$('#accent').checked = state.accent;
+$('#group').checked = state.group;
+$('#accent').addEventListener('change', (e) => { state.accent = e.target.checked; renderDots(); save(); });
+$('#group').addEventListener('change', (e) => { state.group = e.target.checked; renderDots(); save(); });
+
+const clickVol = $('#clickVol'), padVol = $('#padVol'), bright = $('#bright'), fade = $('#fade');
+clickVol.value = state.clickVol; padVol.value = state.padVol; bright.value = state.bright; fade.value = state.fade;
+$('#clickVolVal').textContent = state.clickVol + '%';
+$('#padVolVal').textContent = state.padVol + '%';
+$('#brightVal').textContent = state.bright + '%';
+$('#fadeVal').textContent = fmtFade();
+clickVol.addEventListener('input', () => { state.clickVol = +clickVol.value; $('#clickVolVal').textContent = state.clickVol + '%'; applyMix(); save(); });
+padVol.addEventListener('input', () => { state.padVol = +padVol.value; $('#padVolVal').textContent = state.padVol + '%'; applyMix(); save(); });
+bright.addEventListener('input', () => { state.bright = +bright.value; $('#brightVal').textContent = state.bright + '%'; applyBright(); save(); });
+fade.addEventListener('input', () => { state.fade = +fade.value; $('#fadeVal').textContent = fmtFade(); save(); });
+
+$('#modeStereo').addEventListener('click', () => { state.mode = 'stereo'; renderMode(); applyMix(); save(); });
+$('#modeSplit').addEventListener('click', () => { state.mode = 'split'; renderMode(); applyMix(); save(); });
+
+$('#clickGo').addEventListener('click', () => { clicking ? stopClick() : startClick(); });
+$('#padGo').addEventListener('click', () => { padOn ? stopPad() : startPad(); });
+
+/* início */
+bpmEl.value = state.bpm; bpmRange.value = state.bpm; numVal.textContent = state.num;
+renderDens(); renderPresets(); renderDots(); renderKeys(); renderMode(); renderClickState(); renderPadState();
+})();
+</script>
+</body>
+</html>
