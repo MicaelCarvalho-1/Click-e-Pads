@@ -11,6 +11,12 @@ jobs:
       - name: Baixar os arquivos
         uses: actions/checkout@v4
 
+      - name: Guardar a chave de assinatura do app
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: chave-debug-v1
+
       - name: Instalar Node
         uses: actions/setup-node@v4
         with:
@@ -24,8 +30,13 @@ jobs:
 
       - name: Preparar o app
         run: |
-          mkdir -p www
+          mkdir -p www/sons
           cp index.html www/index.html
+          cp *.ogg www/sons/ 2>/dev/null || true
+          if [ -d sons ]; then cp sons/*.ogg www/sons/; fi
+          N=$(ls www/sons/*.ogg | wc -l)
+          echo "Sons encontrados: $N"
+          test "$N" -eq 36
           npm install
           npx cap add android
           npx cap sync android

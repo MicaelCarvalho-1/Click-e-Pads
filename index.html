@@ -131,6 +131,8 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
 .check input{width:22px;height:22px;accent-color:var(--acc)}
 .note{margin:0;color:var(--muted);font-size:13px}
 
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:500;max-width:90%;text-align:center}
+.sheet .group{margin-top:4px}
 @media (max-height:700px){.ph h2{font-size:20px}.bpm-row{grid-template-columns:52px minmax(0,1fr) 52px}.bpm-row .btn,.lcd{height:52px}#bpm{font-size:44px}.go,.btns2 .btn{min-height:46px}}
 @media (prefers-reduced-motion: reduce){.led,.btn,.go,.panel{transition:none}.btn:active,.go:active{transform:none}.sheet{animation:none}}
 </style>
@@ -212,6 +214,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
 </div>
 
 <div class="scrim" id="scrim" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <section class="sheet click" id="sheetClick" role="dialog" aria-label="Ajustes do click" hidden>
   <div class="sheet-h"><h3>Ajustes do click</h3><button class="btn" type="button" data-close>Fechar</button></div>
@@ -246,9 +249,12 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
   <div class="sheet-h"><h3>Ajustes do pad</h3><button class="btn" type="button" data-close>Fechar</button></div>
 
   <div class="field">
-    <span class="label">Timbre</span>
-    <div class="chips" id="padSounds" role="group" aria-label="Timbre do pad"></div>
+    <span class="label">Seus pads (gravados)</span>
+    <div class="chips" id="padSamples" role="group" aria-label="Pads gravados"></div>
+    <span class="label group">Sintetizados</span>
+    <div class="chips" id="padSounds" role="group" aria-label="Pads sintetizados"></div>
     <p class="note">Ao escolher um timbre com o pad parado, você ouve uma prévia de alguns segundos.</p>
+    <p class="note" id="padMissing" hidden>Alguns tons ainda não têm arquivo. Eles tocam esticados a partir do tom mais próximo e soam menos naturais.</p>
   </div>
 
   <div class="field">
@@ -291,10 +297,19 @@ const KEYDEF = [
 const DENS = [2,4,8,16];
 const PRESETS = [[2,4,false],[3,4,false],[4,4,false],[5,4,false],[6,8,true],[7,8,false],[9,8,true],[12,8,true]];
 const CLICKS = [['madeira','Madeira'],['bipe','Bipe'],['estalo','Estalo'],['agogo','Agogô'],['chimbal','Chimbal']];
-const PADS = [['worship','Worship'],['ambiente','Ambiente'],['shimmer','Shimmer'],['celestial','Celestial'],['cordas','Cordas'],['escuro','Escuro']];
+const SMP = [['motion1','Motion 1'],['motion2','Motion 2'],['motion3','Motion 3']];
+const SYN = [['worship','Worship'],['ambiente','Ambiente'],['shimmer','Shimmer'],['celestial','Celestial'],['cordas','Cordas'],['escuro','Escuro']];
+const PADS = SMP.concat(SYN);
+/* pads gravados: pasta "sons", um arquivo por tom, nomeado motion1_A.ogg, motion1_As.ogg ... (s = sustenido).
+   SAMPLE_KEYS lista os tons que já têm arquivo (0 = C ... 11 = B). */
+const SAMPLE_DIR = 'sons/';
+const KEYFILE = ['C','Cs','D','Ds','E','F','Fs','G','Gs','A','As','B'];
+const ALL12 = [0,1,2,3,4,5,6,7,8,9,10,11];
+const SAMPLE_KEYS = {motion1:ALL12, motion2:ALL12, motion3:ALL12};
+const S_START = 3, S_LOOP_START = 8, S_LOOP_END = 26;   /* segundos dentro do arquivo */
 const STORE = 'clickpads.v1';
 
-const state = {bpm:100,num:4,den:4,group:false,accent:true,clickVol:80,padVol:70,bright:45,reverb:60,fade:4,key:0,mode:'stereo',clickSound:'madeira',padSound:'worship'};
+const state = {bpm:100,num:4,den:4,group:false,accent:true,clickVol:80,padVol:70,bright:45,reverb:60,sBright:100,sReverb:15,fade:4,key:0,mode:'stereo',clickSound:'madeira',padSound:'motion1'};
 try{
   const s = JSON.parse(localStorage.getItem(STORE) || 'null');
   if(s && typeof s === 'object') Object.assign(state, s);
@@ -306,13 +321,18 @@ state.clickVol = clamp(+state.clickVol || 0, 0, 100);
 state.padVol = clamp(+state.padVol || 0, 0, 100);
 state.bright = clamp(+state.bright || 0, 0, 100);
 state.reverb = clamp(isNaN(+state.reverb) ? 60 : +state.reverb, 0, 100);
+state.sBright = clamp(isNaN(+state.sBright) ? 100 : +state.sBright, 0, 100);
+state.sReverb = clamp(isNaN(+state.sReverb) ? 15 : +state.sReverb, 0, 100);
 state.fade = clamp(+state.fade || 4, 0.5, 8);
 state.key = clamp(Math.round(+state.key || 0), 0, 11);
 state.mode = state.mode === 'split' ? 'split' : 'stereo';
 state.group = !!state.group;
 state.accent = state.accent !== false;
 if(!CLICKS.some((c) => c[0] === state.clickSound)) state.clickSound = 'madeira';
-if(!PADS.some((c) => c[0] === state.padSound)) state.padSound = 'worship';
+if(!PADS.some((c) => c[0] === state.padSound)) state.padSound = 'motion1';
+const isSmp = () => !!SAMPLE_KEYS[state.padSound];
+const getBright = () => isSmp() ? state.sBright : state.bright;
+const getReverb = () => isSmp() ? state.sReverb : state.reverb;
 function save(){ try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){} }
 
 /* ---------- ícones e botões ---------- */
@@ -355,7 +375,7 @@ function audio(){
 }
 function applyMix(now){
   if(!ctx) return;
-  const t = ctx.currentTime, tc = now ? 0.001 : 0.03, r = state.reverb / 100;
+  const t = ctx.currentTime, tc = now ? 0.001 : 0.03, r = getReverb() / 100;
   clickBus.gain.setTargetAtTime(Math.pow(state.clickVol/100, 2), t, tc);
   padBus.gain.setTargetAtTime(Math.pow(state.padVol/100, 2) * 0.85, t, tc);
   padDry.gain.setTargetAtTime(1 - 0.3 * r, t, tc);
@@ -463,7 +483,58 @@ const TIMBRES = {
   cordas:    {fm:0.75,lfo:0.12, lvl:0.20, notes:[[-12,0.30,'sawtooth',0],[0,0.20,'sawtooth',14],[7,0.15,'sawtooth',14],[12,0.12,'sawtooth',16]]},
   escuro:    {fm:0.5, lfo:0.07, lvl:0.30, notes:[[-12,0.60,'sine',0],[0,0.35,'triangle',6],[7,0.15,'triangle',6]]}
 };
-let padOn = false, voice = null, prev = null, prevT = 0;
+let padOn = false, voice = null, prev = null, prevT = 0, padToken = 0;
+
+/* ----- pads gravados ----- */
+const cache = new Map();
+function getBuffer(id, j){
+  const name = id + '_' + KEYFILE[j];
+  if(cache.has(name)){ const p = cache.get(name); cache.delete(name); cache.set(name, p); return p; }
+  const c = audio();
+  const p = fetch(SAMPLE_DIR + name + '.ogg')
+    .then((r) => { if(!r.ok) throw new Error('arquivo ' + name); return r.arrayBuffer(); })
+    .then((ab) => c.decodeAudioData(ab));
+  cache.set(name, p);
+  p.catch(() => cache.delete(name));
+  while(cache.size > 6) cache.delete(cache.keys().next().value);
+  return p;
+}
+/* tom que tem arquivo: o próprio, ou o mais próximo */
+function pickKey(id, k){
+  const have = SAMPLE_KEYS[id];
+  if(have.indexOf(k) >= 0) return k;
+  let best = have[0], bd = 99;
+  have.forEach((j) => { const d = Math.abs(((k - j + 18) % 12) - 6); if(d < bd){ bd = d; best = j; } });
+  return best;
+}
+function scut(){ return Math.min(20000, 400 * Math.pow(10, state.sBright / 100 * 1.7)); }
+function makeSampleVoice(buf, j, k){
+  const c = audio(), t = c.currentTime;
+  const out = c.createGain(); out.gain.value = 0;
+  const filt = c.createBiquadFilter(); filt.type = 'lowpass'; filt.Q.value = 0.5; filt.frequency.value = scut();
+  const src = c.createBufferSource();
+  src.buffer = buf; src.loop = true;
+  src.loopStart = S_LOOP_START; src.loopEnd = Math.min(S_LOOP_END, buf.duration);
+  src.detune.value = (((k - j + 18) % 12) - 6) * 100;
+  src.connect(filt); filt.connect(out); out.connect(padIn);
+  src.start(t, S_START);
+  return {out, filt, oscs:[src], smp:true, lvl:1};
+}
+/* devolve uma Promise de função que cria a voz (os arquivos precisam ser carregados antes) */
+function voiceMaker(k){
+  const id = state.padSound;
+  if(SAMPLE_KEYS[id]){
+    const j = pickKey(id, k);
+    return getBuffer(id, j).then((buf) => () => makeSampleVoice(buf, j, k));
+  }
+  return Promise.resolve(() => makeVoice(k));
+}
+let toastT = 0;
+function toast(msg){
+  const el = $('#toast'); el.textContent = msg; el.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 3500);
+}
+const LOAD_FAIL = 'Não consegui carregar o som do pad. Confira se a pasta "sons" está no projeto.';
 function cutoff(fm){ return Math.min(18000, 300 * Math.pow(10, (state.bright / 100) * 1.1) * fm); }
 function makeVoice(k){
   const c = audio(), t = c.currentTime, tb = TIMBRES[state.padSound] || TIMBRES.worship;
@@ -505,22 +576,38 @@ function endPreview(){
 function previewPad(){
   if(padOn) return;
   endPreview();
-  prev = makeVoice(state.key); fadeIn(prev);
-  prevT = setTimeout(endPreview, 4500);
+  const tk = ++padToken;
+  voiceMaker(state.key).then((mk) => {
+    if(tk !== padToken || padOn) return;
+    prev = mk(); fadeIn(prev);
+    prevT = setTimeout(endPreview, isSmp() ? 7000 : 4500);
+  }).catch(() => { if(tk === padToken) toast(LOAD_FAIL); });
 }
 function swapVoice(){
   if(!padOn) return;
-  const old = voice;
-  voice = makeVoice(state.key); fadeIn(voice);
-  if(old) release(old);
+  const tk = ++padToken;
+  voiceMaker(state.key).then((mk) => {
+    if(tk !== padToken || !padOn) return;
+    const old = voice;
+    voice = mk(); fadeIn(voice);
+    if(old) release(old);
+  }).catch(() => { if(tk === padToken) toast(LOAD_FAIL); });
 }
 function startPad(){
   if(padOn) return;
-  endPreview();
-  voice = makeVoice(state.key); fadeIn(voice); padOn = true;
-  renderPadState(); syncWake();
+  endPreview(); audio();
+  padOn = true; renderPadState(); syncWake();
+  const tk = ++padToken;
+  voiceMaker(state.key).then((mk) => {
+    if(tk !== padToken || !padOn) return;
+    voice = mk(); fadeIn(voice);
+  }).catch(() => {
+    if(tk !== padToken) return;
+    padOn = false; renderPadState(); syncWake(); toast(LOAD_FAIL);
+  });
 }
 function stopPad(){
+  padToken++;
   endPreview();
   if(!padOn) return;
   if(voice) release(voice);
@@ -529,7 +616,7 @@ function stopPad(){
 }
 function setKey(k){ state.key = k; save(); swapVoice(); renderKeys(); }
 function setPadSound(id){
-  state.padSound = id; save(); renderPadSounds();
+  state.padSound = id; save(); renderPadSounds(); syncPadSliders(); applyMix();
   if(padOn) swapVoice(); else previewPad();
 }
 function setClickSound(id){
@@ -539,7 +626,9 @@ function setClickSound(id){
 function applyBright(){
   [voice, prev].forEach((v) => {
     if(!v) return;
-    const t = ctx.currentTime, c = cutoff(v.fm);
+    const t = ctx.currentTime;
+    if(v.smp){ v.filt.frequency.setTargetAtTime(scut(), t, 0.05); return; }
+    const c = cutoff(v.fm);
     v.filt.frequency.setTargetAtTime(c, t, 0.05);
     v.lfoG.gain.setTargetAtTime(c * 0.25, t, 0.05);
   });
@@ -636,9 +725,11 @@ function renderPresets(){
 }
 function renderClickSounds(){ chipRow('#clickSounds', CLICKS, state.clickSound, setClickSound); }
 function renderPadSounds(){
-  chipRow('#padSounds', PADS, state.padSound, setPadSound);
+  chipRow('#padSamples', SMP, state.padSound, setPadSound);
+  chipRow('#padSounds', SYN, state.padSound, setPadSound);
   const hit = PADS.filter((p) => p[0] === state.padSound)[0];
   $('#padName').textContent = hit ? hit[1] : '';
+  $('#padMissing').hidden = !(isSmp() && SAMPLE_KEYS[state.padSound].length < 12);
 }
 function renderKeys(){
   const box = $('#keys'); box.innerHTML = '';
@@ -713,17 +804,29 @@ $('#accent').addEventListener('change', (e) => { state.accent = e.target.checked
 $('#group').addEventListener('change', (e) => { state.group = e.target.checked; renderDots(); save(); });
 
 const clickVol = $('#clickVol'), padVol = $('#padVol'), bright = $('#bright'), reverb = $('#reverb'), fade = $('#fade');
-clickVol.value = state.clickVol; padVol.value = state.padVol; bright.value = state.bright; reverb.value = state.reverb; fade.value = state.fade;
-[clickVol, padVol, bright, reverb, fade].forEach(paint);
+clickVol.value = state.clickVol; padVol.value = state.padVol; fade.value = state.fade;
+[clickVol, padVol, fade].forEach(paint);
 $('#clickVolVal').textContent = state.clickVol + '%';
 $('#padVolVal').textContent = state.padVol + '%';
-$('#brightVal').textContent = state.bright + '%';
-$('#reverbVal').textContent = state.reverb + '%';
 $('#fadeVal').textContent = fmtFade();
+/* brilho e reverb têm um valor para os pads gravados e outro para os sintetizados */
+function syncPadSliders(){
+  bright.value = getBright(); reverb.value = getReverb();
+  paint(bright); paint(reverb);
+  $('#brightVal').textContent = getBright() + '%';
+  $('#reverbVal').textContent = getReverb() + '%';
+}
+syncPadSliders();
 clickVol.addEventListener('input', () => { state.clickVol = +clickVol.value; paint(clickVol); $('#clickVolVal').textContent = state.clickVol + '%'; applyMix(); save(); });
 padVol.addEventListener('input', () => { state.padVol = +padVol.value; paint(padVol); $('#padVolVal').textContent = state.padVol + '%'; applyMix(); save(); });
-bright.addEventListener('input', () => { state.bright = +bright.value; paint(bright); $('#brightVal').textContent = state.bright + '%'; applyBright(); save(); });
-reverb.addEventListener('input', () => { state.reverb = +reverb.value; paint(reverb); $('#reverbVal').textContent = state.reverb + '%'; applyMix(); save(); });
+bright.addEventListener('input', () => {
+  if(isSmp()) state.sBright = +bright.value; else state.bright = +bright.value;
+  paint(bright); $('#brightVal').textContent = getBright() + '%'; applyBright(); save();
+});
+reverb.addEventListener('input', () => {
+  if(isSmp()) state.sReverb = +reverb.value; else state.reverb = +reverb.value;
+  paint(reverb); $('#reverbVal').textContent = getReverb() + '%'; applyMix(); save();
+});
 fade.addEventListener('input', () => { state.fade = +fade.value; paint(fade); $('#fadeVal').textContent = fmtFade(); save(); });
 
 $('#modeStereo').addEventListener('click', () => { state.mode = 'stereo'; renderMode(); applyMix(); save(); });
